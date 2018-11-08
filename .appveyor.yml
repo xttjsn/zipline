@@ -102,7 +102,7 @@ install:
   - activate testenv
   - SET CACHE_DIR=%LOCALAPPDATA%\pip\Cache\pip_np%CONDA_NPY%py%CONDA_PY%
   # pip on windows complains
-  - python -m pip install pip-compile --cache-dir=%CACHE_DIR%
+  - python -m pip install pip-tools --cache-dir=%CACHE_DIR%
   - pip-sync ./etc/requirements_dev.txt.out
 #  - python -m pip install -r etc/requirements.txt --cache-dir=%CACHE_DIR%
 #  - python -m pip install -r etc/requirements_dev.txt --cache-dir=%CACHE_DIR%

@@ -85,7 +85,7 @@ install:
   # With this env var and CI both set, pip installing bcolz tries to compile it with coverage on py2, which fails to link against gcov on OSX.
   # https://github.com/Blosc/bcolz/blob/8234a7505da5188dbaf415b7e36d4609d2c8c2f1/setup.py#L134-L136
   - unset TRAVIS
-  - python -m pip install pip-compile --cache-dir=$CACHE_DIR
+  - python -m pip install pip-tools --cache-dir=$CACHE_DIR
   - pip-sync ./etc/requirements_dev.txt.out
 #  - python -m pip install -r etc/requirements.txt --cache-dir=$CACHE_DIR
   - TRAVIS=true  # restore value
