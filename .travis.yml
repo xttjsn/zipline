@@ -85,12 +85,14 @@ install:
   # With this env var and CI both set, pip installing bcolz tries to compile it with coverage on py2, which fails to link against gcov on OSX.
   # https://github.com/Blosc/bcolz/blob/8234a7505da5188dbaf415b7e36d4609d2c8c2f1/setup.py#L134-L136
   - unset TRAVIS
-  - python -m pip install -r etc/requirements.txt --cache-dir=$CACHE_DIR
+  - python -m pip install pip-compile --cache-dir=$CACHE_DIR
+  - pip-sync ./etc/requirements_dev.txt.out
+#  - python -m pip install -r etc/requirements.txt --cache-dir=$CACHE_DIR
   - TRAVIS=true  # restore value
-  - python -m pip install -r etc/requirements_dev.txt --cache-dir=$CACHE_DIR
-  - python -m pip install -r etc/requirements_blaze.txt --cache-dir=$CACHE_DIR  # this uses git requirements right now
-  - python -m pip install -r etc/requirements_talib.txt --cache-dir=$CACHE_DIR
-  - python -m pip install -e .[all] --cache-dir=$CACHE_DIR
+#  - python -m pip install -r etc/requirements_dev.txt --cache-dir=$CACHE_DIR
+#  - python -m pip install -r etc/requirements_blaze.txt --cache-dir=$CACHE_DIR  # this uses git requirements right now
+#  - python -m pip install -r etc/requirements_talib.txt --cache-dir=$CACHE_DIR
+#  - python -m pip install -e .[all] --cache-dir=$CACHE_DIR
 before_script:
   - pip freeze | sort
 script:
