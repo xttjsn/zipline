@@ -17,10 +17,12 @@ from zipline.utils.deprecate import deprecated
 from . import core as bundles
 import numpy as np
 import requests
+import json
+import time
 
 log = Logger(__name__)
 
-API_CD_TIME = 60
+API_CD_TIME = 1
 ONE_MEGABYTE = 1024 * 1024
 PAGE_SIZE = 10000
 INTRINIO_DATA_URL = 'https://api-v2.intrinio.com/securities/{stock}/prices?'
@@ -77,7 +79,7 @@ SP500_SYMBOLS_50 = [
     'PYPL', # PayPal Holdings Inc
     'HON',  # Honeywell International Inc.
     'NKE',  # NIKE Inc. Class B
-    ],
+    ]
 
 CUSTOM_SYMBOLS = [
     'YRD'
@@ -88,7 +90,7 @@ all_symbols = SP500_SYMBOLS_50 + CUSTOM_SYMBOLS
 def format_data_url(symbol, api_key):
     """ Build the query URL for Intrinio prices.
     """
-    query_params = = [('api_key', api_key), ('page_size', PAGE_SIZE)]
+    query_params = [('api_key', api_key), ('page_size', PAGE_SIZE)]
     return (INTRINIO_DATA_URL + urlencode(query_params)).format(stock=symbol),\
         (INTRINIO_ADJ_URL + urlencode(query_params)).format(stock=symbol)
 
@@ -97,25 +99,31 @@ def download_intrinio_price(data_url, adj_url, show_progress=False):
     Download data from intrino stock price API, returning a pd.DataFrame
     containing all the pages of the loaded data. 
     """
-    is_more = True
     tables = []
-    params = []
+    params = {}
     json_data = None
+    prev_page = 'abcdefg'  # Random value
 
+    def paramdeco(params):
+        if params:
+            return '&' + params
+        return ''
+    
     # Donwload price data
-    while is_more:
+    while True:
         if show_progress:
-            log.info('Downloading a page of price data @{url}'.format(url=data_url))
-        data = download_without_progress(url + urlencode(params))
+            log.info('Downloading a page of price data @{url}'.format(url=data_url + paramdeco(urlencode(params))))
+
+        data = download_without_progress(data_url + paramdeco(urlencode(params)))
         json_data = json.loads(data.read())
         tables.append(pd.DataFrame.from_dict(json_data['stock_prices']))
-        if 'next_page' in json_data:
-            params = [('next_page', json_data['next_page'])]
-            log.info("Sleep for {t} seconds to CD the api call".format(t=API_CD_TIME))
-            time.sleep(API_CD_TIME)
+        log.info("Sleep for {t} seconds to CD the api call".format(t=API_CD_TIME))
+        time.sleep(API_CD_TIME)
+        if json_data['next_page'] != None:
+            params['next_page'] = json_data['next_page']
         else:
-            is_more = False
-    
+            break
+        
     table = pd.concat(tables)
     table.insert(0, 'symbol', json_data['security']['ticker'])
     table.insert(1, 'asset_name', json_data['security']['name'])
@@ -124,14 +132,20 @@ def download_intrinio_price(data_url, adj_url, show_progress=False):
     if show_progress:
         log.info('Downloading adjustment data @{url}'.format(url=adj_url))
 
-    data = download_with_progress(adj_url)
+    data = download_without_progress(adj_url)
     json_data = json.loads(data.read())
     adj_table = pd.DataFrame.from_dict(json_data['stock_price_adjustments'])
-    table = pd.merge(table, adj_table, how='outer', on='date')
-    table.fillna(value={'dividend' : 0,
-                        'dividend_currency' : 'USD',
-                        'factor' : 1,
-                        'split_ratio' : 1.0})
+    if not adj_table.empty:
+        table = pd.merge(table, adj_table, how='outer', on='date')
+        table.fillna(value={'dividend' : 0,
+                            'dividend_currency' : 'USD',
+                            'factor' : 1,
+                            'split_ratio' : 1.0}, inplace=True)
+    else:
+        table['dividend'] = 0
+        table['dividend_currency'] = 'USD'
+        table['factor'] = 1
+        table['split_ratio'] = 1.0
         
     return table
         
@@ -166,7 +180,7 @@ def fetch_raw_data(api_key,
                    retries):
     """ Fetch raw price data from Intrinio
     """
-    filetable = []
+    tables = []
     for _ in range(retries):
         try:
             if show_progress:
@@ -179,14 +193,12 @@ def fetch_raw_data(api_key,
                     show_progress
                 )
 
-                filetable.append(table)
+                tables.append(table)
 
                 log.info("Sleep for {t} seconds to CD the api call".format(t=API_CD_TIME))
                 time.sleep(API_CD_TIME)
 
-            return load_data_table(
-                filetable=filatable
-                )
+            return load_data_table(tables)
 
         except Exception:
             log.exception("Exception raised reading Intrinio data. Retrying.")
@@ -206,13 +218,13 @@ def gen_asset_metadata(data, show_progress):
         {'date' : [np.min, np.max]}
     )
     data.reset_index(inplace=True)
-    data['start_date'] = date.date.amin
+    data['start_date'] = data.date.amin
     data['end_date'] = data.date.amax
     del data['date']
     data.columns = data.columns.get_level_values(0)
 
     data['exchange'] = 'INTRINIO'
-    data['auto_close_date'] = data['end_date'].values + pd.Timedelta(days=1)
+    data['auto_close_date'] = data['end_date'].values.astype(np.datetime64) + pd.Timedelta(days=1)
     return data
 
 def parse_pricing_and_vol(data,
@@ -224,7 +236,7 @@ def parse_pricing_and_vol(data,
             level=1
         ).reindex(
             sessions.tz_localize(None)
-        ).fillna(0, 0)
+        ).fillna(0.0)
         yield asset_id, asset_data
 
 def parse_splits(data, show_progress):
@@ -246,7 +258,7 @@ def parse_dividends(data, show_progress):
     if show_progress:
         log.info('Parsing dividends.')
 
-    data['record_date'] = data['declared_date'] = date['pay_date'] = pd.NaT
+    data['record_date'] = data['declared_date'] = data['pay_date'] = pd.NaT
 
     data.rename(
         columns={
@@ -304,9 +316,12 @@ def intrinio_bundle(environ,
         show_progress=show_progress
     )
 
-    raw_data.repset_index(inplace=True)
+    raw_data.reset_index(inplace=True)
     raw_data['symbol'] = raw_data['symbol'].astype('category')
     raw_data['sid'] = raw_data.symbol.cat.codes
+
+    print('raw_data : {}'.format(raw_data.head()))
+    
     adjustment_writer.write(
         splits=parse_splits(
             raw_data[[
