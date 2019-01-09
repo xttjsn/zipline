@@ -9,6 +9,7 @@ from click import progressbar
 from logbook import Logger
 import pandas as pd
 import requests
+import bcolz
 
 from requests.auth import HTTPBasicAuth
 
@@ -32,59 +33,60 @@ PAGE_SIZE = 10000
 INTRINIO_DATA_URL = 'https://api.intrinio.com/prices.csv?identifier={stock}'
 
 SP500_SYMBOLS = [ "MSFT" ,"AAPL" ,"AMZN" ,"BRK.B" ,"JNJ" ,"JPM" ,"FB"
-                  ,"GOOG" ,"GOOGL" ,"XOM" ,"PFE" ,"VZ" ,"UNH" ,"PG" ,"V" ,"BAC" ,"T"
-                  ,"CVX" ,"INTC" ,"WFC" ,"MRK" ,"HD" ,"CSCO" ,"KO" ,"MA" ,"BA" ,"DIS"
-                  ,"CMCSA" ,"PEP" ,"MCD" ,"WMT" ,"ABBV" ,"C" ,"DWDP" ,"AMGN" ,"NFLX"
-                  ,"ABT" ,"MDT" ,"ORCL" ,"MMM" ,"ADBE" ,"LLY" ,"PM" ,"IBM" ,"CRM" ,"UNP"
-                  ,"PYPL" ,"HON" ,"AVGO" ,"NKE" ,"MO" ,"COST" ,"ACN" ,"TMO" ,"TXN"
-                  ,"CVS" ,"GILD" ,"UTX" ,"LIN" ,"NEE" ,"NVDA" ,"BKNG" ,"SBUX" ,"BMY"
-                  ,"LOW" ,"COP" ,"CAT" ,"GE" ,"USB" ,"AMT" ,"CI" ,"QCOM" ,"UPS" ,"AXP"
-                  ,"CME" ,"ANTM" ,"LMT" ,"BIIB" ,"DUK" ,"DHR" ,"GS" ,"MDLZ" ,"CB" ,"BDX"
-                  ,"CELG" ,"TJX" ,"ADP" ,"PNC" ,"WBA" ,"D" ,"MS" ,"EOG" ,"SLB" ,"ISRG"
-                  ,"CHTR" ,"CL" ,"SPG" ,"FOXA" ,"CSX" ,"INTU" ,"SCHW" ,"SYK" ,"OXY"
-                  ,"BLK" ,"DE" ,"SO" ,"BSX" ,"CCI" ,"AGN" ,"BK" ,"GD" ,"RTN" ,"EXC"
-                  ,"ICE" ,"GM" ,"VRTX" ,"ILMN" ,"NOC" ,"SPGI" ,"MPC" ,"MET" ,"NSC"
-                  ,"MMC" ,"ZTS" ,"KMB" ,"FDX" ,"ITW" ,"HUM" ,"PSX" ,"EMR" ,"COF" ,"ECL"
-                  ,"AEP" ,"PLD" ,"CTSH" ,"MU" ,"WM" ,"ATVI" ,"TGT" ,"AON" ,"AIG" ,"BBT"
-                  ,"APD" ,"AFL" ,"PRU" ,"PGR" ,"FIS" ,"HCA" ,"BAX" ,"VLO" ,"HPQ" ,"SHW"
-                  ,"ROST" ,"AMAT" ,"RHT" ,"TRV" ,"F" ,"EW" ,"ADI" ,"KMI" ,"PSA" ,"SYY"
-                  ,"SRE" ,"MAR" ,"ETN" ,"REGN" ,"DAL" ,"DG" ,"FISV" ,"YUM" ,"EL" ,"EQIX"
-                  ,"ORLY" ,"JCI" ,"ALL" ,"WMB" ,"STZ" ,"KHC" ,"ROP" ,"ADSK" ,"LYB"
-                  ,"WELL" ,"EBAY" ,"PEG" ,"TEL" ,"XEL" ,"EA" ,"STI" ,"HAL" ,"PPG" ,"EQR"
-                  ,"LUV" ,"AVB" ,"STT" ,"ED" ,"GIS" ,"FOX" ,"ADM" ,"PXD" ,"APC" ,"MCO"
-                  ,"GLW" ,"VFC" ,"CNC" ,"MCK" ,"APH" ,"ALXN" ,"OKE" ,"IR" ,"KR" ,"TROW"
-                  ,"AZO" ,"DLTR" ,"CXO" ,"WEC" ,"DLR" ,"XLNX" ,"LRCX" ,"MTB" ,"VTR"
-                  ,"PAYX" ,"ZBH" ,"PPL" ,"TWTR" ,"A" ,"HLT" ,"DFS" ,"ES" ,"PCAR" ,"DTE"
-                  ,"CMI" ,"CLX" ,"PH" ,"CCL" ,"WLTW" ,"FTV" ,"MNST" ,"HPE" ,"SBAC" ,"O"
-                  ,"EIX" ,"UAL" ,"NTRS" ,"NEM" ,"MSI" ,"SWK" ,"ROK" ,"FE" ,"IQV" ,"VRSK"
-                  ,"BXP" ,"WY" ,"INFO" ,"CERN" ,"MKC" ,"IP" ,"SYF" ,"NUE" ,"TSN" ,"FITB"
-                  ,"AWK" ,"OMC" ,"FLT" ,"APTV" ,"RCL" ,"KEY" ,"TDG" ,"GPN" ,"CHD" ,"ESS"
-                  ,"CBS" ,"RSG" ,"MCHP" ,"AEE" ,"IDXX" ,"DXC" ,"HRS" ,"VRSN" ,"BLL"
-                  ,"HIG" ,"ETR" ,"AME" ,"RMD" ,"AMD" ,"EVRG" ,"NTAP" ,"AMP" ,"HSY"
-                  ,"FANG" ,"CTL" ,"FCX" ,"CFG" ,"FRC" ,"K" ,"FAST" ,"RF" ,"CTAS" ,"MYL"
-                  ,"CNP" ,"ULTA" ,"CMS" ,"GPC" ,"WAT" ,"ABMD" ,"ALGN" ,"MXIM" ,"HCP"
-                  ,"KLAC" ,"IFF" ,"CAH" ,"LLL" ,"TSS" ,"MTD" ,"CTXS" ,"EXPE" ,"HBAN"
-                  ,"AJG" ,"VMC" ,"MGM" ,"LH" ,"MSCI" ,"MRO" ,"L" ,"BBY" ,"AAL" ,"PCG"
-                  ,"DRI" ,"GWW" ,"HST" ,"COO" ,"DHI" ,"AAP" ,"CBRE" ,"SNPS" ,"SYMC"
-                  ,"INCY" ,"ARE" ,"ABC" ,"CDNS" ,"LEN" ,"WCG" ,"ANSS" ,"PFG" ,"XYL"
-                  ,"CE" ,"HRL" ,"EXPD" ,"TTWO" ,"HSIC" ,"CMA" ,"ETFC" ,"CINF" ,"EXR"
-                  ,"TXT" ,"IT" ,"KSS" ,"CHRW" ,"DVN" ,"NRG" ,"LNC" ,"KMX" ,"EFX" ,"BR"
-                  ,"DGX" ,"KEYS" ,"SWKS" ,"TAP" ,"CMG" ,"LW" ,"SJM" ,"UDR" ,"HES"
-                  ,"CBOE" ,"MLM" ,"BHGE" ,"MAA" ,"CAG" ,"HOLX" ,"WDC" ,"VNO" ,"APA"
-                  ,"ANET" ,"COG" ,"DOV" ,"VAR" ,"WYNN" ,"MOS" ,"EMN" ,"SIVB" ,"UHS"
-                  ,"TSCO" ,"NOV" ,"WRK" ,"FMC" ,"FTNT" ,"REG" ,"LNT" ,"STX" ,"CPRT"
-                  ,"KSU" ,"AKAM" ,"TPR" ,"CF" ,"RJF" ,"JKHY" ,"FFIV" ,"IRM" ,"AES"
-                  ,"PNW" ,"VIAB" ,"NBL" ,"NI" ,"HAS" ,"M" ,"NDAQ" ,"JNPR" ,"BEN" ,"NCLH"
-                  ,"MAS" ,"DRE" ,"TIF" ,"DISCK" ,"FTI" ,"RE" ,"FRT" ,"URI" ,"XRAY"
-                  ,"NLSN" ,"SNA" ,"HII" ,"ZION" ,"PKI" ,"HFC" ,"NWL" ,"ARNC" ,"ALB"
-                  ,"JBHT" ,"IPG" ,"PKG" ,"TMK" ,"BF.B" ,"ALLE" ,"AVY" ,"WU" ,"GRMN"
-                  ,"MHK" ,"LKQ" ,"ADS" ,"ALK" ,"BWA" ,"PVH" ,"QRVO" ,"WHR" ,"JEC" ,"PHM"
-                  ,"IVZ" ,"SLG" ,"AIV" ,"UNM" ,"RHI" ,"DVA" ,"FL" ,"CPB" ,"KIM" ,"AOS"
-                  ,"LB" ,"DISH" ,"PNR" ,"XEC" ,"FLIR" ,"RL" ,"GPS" ,"CPRI" ,"SEE" ,"HOG"
-                  ,"NKTR" ,"PBCT" ,"JWN" ,"FBHS" ,"ROL" ,"TRIP" ,"HP" ,"AMG" ,"HRB"
-                  ,"JEF" ,"PRGO" ,"GT" ,"FLS" ,"AIZ" ,"MAC" ,"LEG" ,"HBI" ,"FLR" ,"XRX"
-                  ,"PWR" ,"NWSA" ,"DISCA" ,"IPGP" ,"BHF" ,"UAA" ,"MAT" ,"COTY" ,"NFX"
-                  ,"UA" ,"NWS"]
+                  # ,"GOOG" ,"GOOGL" ,"XOM" ,"PFE" ,"VZ" ,"UNH" ,"PG" ,"V" ,"BAC" ,"T"
+                  # ,"CVX" ,"INTC" ,"WFC" ,"MRK" ,"HD" ,"CSCO" ,"KO" ,"MA" ,"BA" ,"DIS"
+                  # ,"CMCSA" ,"PEP" ,"MCD" ,"WMT" ,"ABBV" ,"C" ,"DWDP" ,"AMGN" ,"NFLX"
+                  # ,"ABT" ,"MDT" ,"ORCL" ,"MMM" ,"ADBE" ,"LLY" ,"PM" ,"IBM" ,"CRM" ,"UNP"
+                  # ,"PYPL" ,"HON" ,"AVGO" ,"NKE" ,"MO" ,"COST" ,"ACN" ,"TMO" ,"TXN"
+                  # ,"CVS" ,"GILD" ,"UTX" ,"LIN" ,"NEE" ,"NVDA" ,"BKNG" ,"SBUX" ,"BMY"
+                  # ,"LOW" ,"COP" ,"CAT" ,"GE" ,"USB" ,"AMT" ,"CI" ,"QCOM" ,"UPS" ,"AXP"
+                  # ,"CME" ,"ANTM" ,"LMT" ,"BIIB" ,"DUK" ,"DHR" ,"GS" ,"MDLZ" ,"CB" ,"BDX"
+                  # ,"CELG" ,"TJX" ,"ADP" ,"PNC" ,"WBA" ,"D" ,"MS" ,"EOG" ,"SLB" ,"ISRG"
+                  # ,"CHTR" ,"CL" ,"SPG" ,"FOXA" ,"CSX" ,"INTU" ,"SCHW" ,"SYK" ,"OXY"
+                  # ,"BLK" ,"DE" ,"SO" ,"BSX" ,"CCI" ,"AGN" ,"BK" ,"GD" ,"RTN" ,"EXC"
+                  # ,"ICE" ,"GM" ,"VRTX" ,"ILMN" ,"NOC" ,"SPGI" ,"MPC" ,"MET" ,"NSC"
+                  # ,"MMC" ,"ZTS" ,"KMB" ,"FDX" ,"ITW" ,"HUM" ,"PSX" ,"EMR" ,"COF" ,"ECL"
+                  # ,"AEP" ,"PLD" ,"CTSH" ,"MU" ,"WM" ,"ATVI" ,"TGT" ,"AON" ,"AIG" ,"BBT"
+                  # ,"APD" ,"AFL" ,"PRU" ,"PGR" ,"FIS" ,"HCA" ,"BAX" ,"VLO" ,"HPQ" ,"SHW"
+                  # ,"ROST" ,"AMAT" ,"RHT" ,"TRV" ,"F" ,"EW" ,"ADI" ,"KMI" ,"PSA" ,"SYY"
+                  # ,"SRE" ,"MAR" ,"ETN" ,"REGN" ,"DAL" ,"DG" ,"FISV" ,"YUM" ,"EL" ,"EQIX"
+                  # ,"ORLY" ,"JCI" ,"ALL" ,"WMB" ,"STZ" ,"KHC" ,"ROP" ,"ADSK" ,"LYB"
+                  # ,"WELL" ,"EBAY" ,"PEG" ,"TEL" ,"XEL" ,"EA" ,"STI" ,"HAL" ,"PPG" ,"EQR"
+                  # ,"LUV" ,"AVB" ,"STT" ,"ED" ,"GIS" ,"FOX" ,"ADM" ,"PXD" ,"APC" ,"MCO"
+                  # ,"GLW" ,"VFC" ,"CNC" ,"MCK" ,"APH" ,"ALXN" ,"OKE" ,"IR" ,"KR" ,"TROW"
+                  # ,"AZO" ,"DLTR" ,"CXO" ,"WEC" ,"DLR" ,"XLNX" ,"LRCX" ,"MTB" ,"VTR"
+                  # ,"PAYX" ,"ZBH" ,"PPL" ,"TWTR" ,"A" ,"HLT" ,"DFS" ,"ES" ,"PCAR" ,"DTE"
+                  # ,"CMI" ,"CLX" ,"PH" ,"CCL" ,"WLTW" ,"FTV" ,"MNST" ,"HPE" ,"SBAC" ,"O"
+                  # ,"EIX" ,"UAL" ,"NTRS" ,"NEM" ,"MSI" ,"SWK" ,"ROK" ,"FE" ,"IQV" ,"VRSK"
+                  # ,"BXP" ,"WY" ,"INFO" ,"CERN" ,"MKC" ,"IP" ,"SYF" ,"NUE" ,"TSN" ,"FITB"
+                  # ,"AWK" ,"OMC" ,"FLT" ,"APTV" ,"RCL" ,"KEY" ,"TDG" ,"GPN" ,"CHD" ,"ESS"
+                  # ,"CBS" ,"RSG" ,"MCHP" ,"AEE" ,"IDXX" ,"DXC" ,"HRS" ,"VRSN" ,"BLL"
+                  # ,"HIG" ,"ETR" ,"AME" ,"RMD" ,"AMD" ,"EVRG" ,"NTAP" ,"AMP" ,"HSY"
+                  # ,"FANG" ,"CTL" ,"FCX" ,"CFG" ,"FRC" ,"K" ,"FAST" ,"RF" ,"CTAS" ,"MYL"
+                  # ,"CNP" ,"ULTA" ,"CMS" ,"GPC" ,"WAT" ,"ABMD" ,"ALGN" ,"MXIM" ,"HCP"
+                  # ,"KLAC" ,"IFF" ,"CAH" ,"LLL" ,"TSS" ,"MTD" ,"CTXS" ,"EXPE" ,"HBAN"
+                  # ,"AJG" ,"VMC" ,"MGM" ,"LH" ,"MSCI" ,"MRO" ,"L" ,"BBY" ,"AAL" ,"PCG"
+                  # ,"DRI" ,"GWW" ,"HST" ,"COO" ,"DHI" ,"AAP" ,"CBRE" ,"SNPS" ,"SYMC"
+                  # ,"INCY" ,"ARE" ,"ABC" ,"CDNS" ,"LEN" ,"WCG" ,"ANSS" ,"PFG" ,"XYL"
+                  # ,"CE" ,"HRL" ,"EXPD" ,"TTWO" ,"HSIC" ,"CMA" ,"ETFC" ,"CINF" ,"EXR"
+                  # ,"TXT" ,"IT" ,"KSS" ,"CHRW" ,"DVN" ,"NRG" ,"LNC" ,"KMX" ,"EFX" ,"BR"
+                  # ,"DGX" ,"KEYS" ,"SWKS" ,"TAP" ,"CMG" ,"LW" ,"SJM" ,"UDR" ,"HES"
+                  # ,"CBOE" ,"MLM" ,"BHGE" ,"MAA" ,"CAG" ,"HOLX" ,"WDC" ,"VNO" ,"APA"
+                  # ,"ANET" ,"COG" ,"DOV" ,"VAR" ,"WYNN" ,"MOS" ,"EMN" ,"SIVB" ,"UHS"
+                  # ,"TSCO" ,"NOV" ,"WRK" ,"FMC" ,"FTNT" ,"REG" ,"LNT" ,"STX" ,"CPRT"
+                  # ,"KSU" ,"AKAM" ,"TPR" ,"CF" ,"RJF" ,"JKHY" ,"FFIV" ,"IRM" ,"AES"
+                  # ,"PNW" ,"VIAB" ,"NBL" ,"NI" ,"HAS" ,"M" ,"NDAQ" ,"JNPR" ,"BEN" ,"NCLH"
+                  # ,"MAS" ,"DRE" ,"TIF" ,"DISCK" ,"FTI" ,"RE" ,"FRT" ,"URI" ,"XRAY"
+                  # ,"NLSN" ,"SNA" ,"HII" ,"ZION" ,"PKI" ,"HFC" ,"NWL" ,"ARNC" ,"ALB"
+                  # ,"JBHT" ,"IPG" ,"PKG" ,"TMK" ,"BF.B" ,"ALLE" ,"AVY" ,"WU" ,"GRMN"
+                  # ,"MHK" ,"LKQ" ,"ADS" ,"ALK" ,"BWA" ,"PVH" ,"QRVO" ,"WHR" ,"JEC" ,"PHM"
+                  # ,"IVZ" ,"SLG" ,"AIV" ,"UNM" ,"RHI" ,"DVA" ,"FL" ,"CPB" ,"KIM" ,"AOS"
+                  # ,"LB" ,"DISH" ,"PNR" ,"XEC" ,"FLIR" ,"RL" ,"GPS" ,"CPRI" ,"SEE" ,"HOG"
+                  # ,"NKTR" ,"PBCT" ,"JWN" ,"FBHS" ,"ROL" ,"TRIP" ,"HP" ,"AMG" ,"HRB"
+                  # ,"JEF" ,"PRGO" ,"GT" ,"FLS" ,"AIZ" ,"MAC" ,"LEG" ,"HBI" ,"FLR" ,"XRX"
+                  # ,"PWR" ,"NWSA" ,"DISCA" ,"IPGP" ,"BHF" ,"UAA" ,"MAT" ,"COTY" ,"NFX"
+                  # ,"UA" ,"NWS"
+]
 
 CUSTOM_SYMBOLS = [
     'YRD',
@@ -240,6 +242,17 @@ def parse_dividends(data, show_progress):
         copy=False,
     )
     return data
+
+def test_download():
+    # Bcolz testing
+    data_base_dir = expanduser('~') + '/.zipline/data/intrinio'
+    for dirname in os.listdir(data_base_dir):
+        daily_bcolz_path = '/'.join([data_base_dir, dirname, 'daily_equities.bcolz'])
+        daily_ctable = bcolz.open(daily_bcolz_path)
+        daily_df = pd.DataFrame(daily_ctable[:])
+        assert daily_df.all().all(),
+        'Zeroes in bcolz, please check {path}'.format(daily_bcolz_path)  # No zero value
+
         
 @bundles.register('intrinio')
 def intrinio_bundle(environ,
@@ -269,6 +282,10 @@ def intrinio_bundle(environ,
         show_progress,
         environ.get('INTRINIO_DOWNLOAD_ATTEMPTS', 5)
     )
+
+    ###### DEBUG
+    raw_data.describe()
+    ###### END_DEBUG
 
     asset_metadata = gen_asset_metadata(
         raw_data[['symbol', 'date']],
@@ -314,3 +331,6 @@ def intrinio_bundle(environ,
             show_progress=show_progress
         )
     )
+
+    # Test the downloaded bcolz
+    test_download()
