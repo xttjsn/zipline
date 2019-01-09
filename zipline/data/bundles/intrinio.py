@@ -9,7 +9,9 @@ from click import progressbar
 from logbook import Logger
 import pandas as pd
 import requests
+
 from requests.auth import HTTPBasicAuth
+
 from six.moves.urllib.parse import urlencode
 from six import iteritems
 from trading_calendars import register_calendar_alias
@@ -18,6 +20,7 @@ from zipline.utils.deprecate import deprecated
 from . import core as bundles
 import numpy as np
 import requests
+
 import time
 
 log = Logger(__name__)
@@ -25,6 +28,7 @@ log = Logger(__name__)
 API_CD_TIME = 1
 ONE_MEGABYTE = 1024 * 1024
 PAGE_SIZE = 10000
+
 INTRINIO_DATA_URL = 'https://api.intrinio.com/prices.csv?identifier={stock}'
 
 SP500_SYMBOLS = [ "MSFT" ,"AAPL" ,"AMZN" ,"BRK.B" ,"JNJ" ,"JPM" ,"FB"
@@ -92,6 +96,7 @@ all_symbols = SP500_SYMBOLS + CUSTOM_SYMBOLS
 def format_data_url(symbol, api_key):
     """ Build the query URL for Intrinio prices.
     """
+
     return INTRINIO_DATA_URL.format(stock=symbol)
 
 
@@ -100,6 +105,7 @@ def download_intrinio_price(data_url, auth, show_progress=False):
     Download data from intrino stock price API, returning a pd.DataFrame
     containing all the pages of the loaded data. 
     """
+
     # Donwload price data
     if show_progress:
         log.info('Downloading price data @{url}'.format(url=data_url))
@@ -125,6 +131,7 @@ def download_without_progress(url, auth):
     data : BytesIO
         A BytesIO containing the downloaded data.
     """
+
     resp = requests.get(url, auth=auth)
     resp.raise_for_status()
     return BytesIO(resp.content)
